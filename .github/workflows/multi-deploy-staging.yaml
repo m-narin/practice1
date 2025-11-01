@@ -1,0 +1,91 @@
+name: Multi deploy staging
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-deploy-branch:
+    runs-on: ubuntu-22.04-arm64
+    concurrency:
+      group: update-multi-deploy-staging
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      sha: ${{ steps.get-sha.outputs.sha }}
+
+    steps:
+      - name: Checkout full repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set Git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: List open PRs with label deploy/staging
+        run: |
+          gh pr list \
+            --state=open \
+            --label=deploy/staging \
+            --json number \
+            --jq '.[].number' \
+            > pr_lists.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reset deploy/staging branch to develop
+        run: |
+          git fetch origin develop
+          git checkout -B deploy/staging origin/develop
+
+      - name: Debug Show raw pr_lists.json
+        run: |
+          echo "=== raw pr_lists.json ==="
+          cat pr_lists.json || echo "(none)"
+          echo "=== End raw ==="
+
+      - name: Merge each labeled PR
+        run: |
+          if [ ! -s pr_lists.json ]; then
+            echo "No deploy/staging PRs found, skipping merge step."
+            exit 0
+          fi
+          while IFS= read -r pr; do
+            echo "Merging PR #$pr…"
+            git fetch origin pull/"$pr"/head:pr-"$pr"
+            if git merge --no-ff pr-"$pr" -m "Merge PR #$pr"; then
+              echo "merged #$pr"
+            else
+              echo "conflict in #$pr, aborting" >&2
+              git merge --abort
+              exit 1
+            fi
+          done < pr_lists.json
+
+      - name: Push to deploy/staging
+        run: |
+          git push origin deploy/staging --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current SHA
+        id: get-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+  # ${{ needs.update-deploy-branch.outputs.sha }}で「deploy/staging」ブランチの最新コミットハッシュが取得できます。
+  # この後は各々のdeployワークフローを設定する必要があります。
+  build:
+    needs: update-deploy-branch
+    # 各自追記
+
+  migrate:
+    needs: update-deploy-branch
+    # 各自追記
+
+  deploy:
+    needs: update-deploy-branch
+    # 各自追記
