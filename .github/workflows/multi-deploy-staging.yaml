@@ -78,14 +78,14 @@ jobs:
 
   # ${{ needs.update-deploy-branch.outputs.sha }}で「deploy/staging」ブランチの最新コミットハッシュが取得できます。
   # この後は各々のdeployワークフローを設定する必要があります。
-  build:
-    needs: update-deploy-branch
-    # 各自追記
+  # build:
+  #   needs: update-deploy-branch
+  #   # 各自追記
 
-  migrate:
-    needs: update-deploy-branch
-    # 各自追記
+  # migrate:
+  #   needs: update-deploy-branch
+  #   # 各自追記
 
-  deploy:
-    needs: update-deploy-branch
-    # 各自追記
+  # deploy:
+  #   needs: update-deploy-branch
+  #   # 各自追記
